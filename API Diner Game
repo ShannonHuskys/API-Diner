@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The API Diner: Learn APIs by Doing</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@400;600;800&display=swap');
+
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent: #38bdf8;
+            --success: #22c55e;
+            --error: #ef4444;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            color: white;
+            overflow-x: hidden;
+        }
+
+        .code-font {
+            font-family: 'Space Mono', monospace;
+        }
+
+        .terminal-glow {
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.15);
+        }
+
+        .customer-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes pulse-soft {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .pulse {
+            animation: pulse-soft 2s infinite;
+        }
+
+        .log-entry {
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(-10px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+
+    <div id="app" class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <header class="text-center mb-10">
+            <h1 class="text-4xl md:text-6xl font-extrabold mb-2 bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
+                THE API DINER
+            </h1>
+            <p class="text-slate-400 text-lg">Act as the <span class="text-blue-400 font-bold underline decoration-blue-500/30">API Waiter</span> to connect Clients to the Kitchen.</p>
+        </header>
+
+        <!-- Game Container -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- Left Side: Customers (Requests) -->
+            <div class="lg:col-span-3 space-y-6">
+                <h2 class="text-xl font-bold flex items-center gap-2">
+                    <span class="p-2 bg-blue-500/20 rounded-lg">👤</span> Customers
+                </h2>
+                <div id="customer-list" class="space-y-3">
+                    <!-- Customers injected here -->
+                </div>
+            </div>
+
+            <!-- Middle: The API Interface -->
+            <div class="lg:col-span-6 space-y-6">
+                <div class="bg-slate-800 rounded-2xl border-2 border-slate-700 p-6 terminal-glow relative overflow-hidden">
+                    <div id="active-request-ui">
+                        <div class="text-center py-20 text-slate-500 italic">
+                            <div class="text-4xl mb-4 opacity-20">📡</div>
+                            Select a customer request to begin...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Learning Panel -->
+                <div class="bg-blue-900/20 border border-blue-500/30 rounded-xl p-5">
+                    <h3 class="font-bold text-blue-400 mb-2 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
+                        API Concept
+                    </h3>
+                    <p id="learning-tip" class="text-sm text-slate-300 leading-relaxed">
+                        An API is the middleman. It takes your request, checks if you're allowed to ask, tells the system what to do, and brings back the result.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Right Side: History Log -->
+            <div class="lg:col-span-3 space-y-6">
+                <h2 class="text-xl font-bold flex items-center gap-2">
+                    <span class="p-2 bg-emerald-500/20 rounded-lg">📋</span> Response Log
+                </h2>
+                <div id="response-log" class="bg-slate-900/50 rounded-xl border border-slate-800 h-[400px] overflow-y-auto p-4 space-y-2 code-font text-xs">
+                    <div class="text-slate-600 italic">No activity yet...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Success/Fail Modal -->
+        <div id="modal-overlay" class="fixed inset-0 bg-black/80 hidden z-50 flex items-center justify-center p-4">
+            <div class="bg-slate-800 border-2 border-emerald-500 rounded-3xl p-8 max-w-md w-full text-center">
+                <div id="modal-icon" class="text-6xl mb-4">🚀</div>
+                <h2 id="modal-title" class="text-2xl font-bold mb-2">Success!</h2>
+                <div id="modal-content" class="text-slate-300 mb-6"></div>
+                <button onclick="closeModal()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl transition">Next Request</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const customers = [
+            {
+                id: 1,
+                name: "Hungry Robot",
+                avatar: "🤖",
+                order: "View the Menu",
+                target: "/menu",
+                method: "GET",
+                tip: "GET is like asking for a menu. You are fetching information without changing anything in the system.",
+                expectedResponse: 200,
+                difficulty: "Easy"
+            },
+            {
+                id: 2,
+                name: "Burger Fan",
+                avatar: "🍔",
+                order: "Order a Burger",
+                target: "/orders",
+                method: "POST",
+                payload: { item: "Double-Cheeseburger", quantity: 1 },
+                tip: "POST is like handing in a paper order form. You are sending new data to be created in the database.",
+                expectedResponse: 201,
+                difficulty: "Medium"
+            },
+            {
+                id: 3,
+                name: "The VIP",
+                avatar: "🎩",
+                order: "Access Secret Lounge",
+                target: "/vip-lounge",
+                method: "GET",
+                requiresAuth: true,
+                tip: "Headers are extra info. An 'Authorization' header is like showing a VIP badge to a guard (the API).",
+                expectedResponse: 200,
+                difficulty: "Hard"
+            },
+            {
+                id: 4,
+                name: "Food Critic",
+                avatar: "📝",
+                order: "Update Review #9",
+                target: "/reviews/9",
+                method: "PUT",
+                payload: { rating: 5, comment: "Excellent service!" },
+                tip: "PUT is used for updating existing data. Think of it as replacing an old review with a new version.",
+                expectedResponse: 200,
+                difficulty: "Medium"
+            }
+        ];
+
+        let activeId = null;
+        let gameState = {
+            method: null,
+            headers: [],
+            body: null
+        };
+        let logs = [];
+
+        function init() {
+            renderCustomers();
+        }
+
+        function renderCustomers() {
+            const list = document.getElementById('customer-list');
+            list.innerHTML = customers.map(c => `
+                <div onclick="selectCustomer(${c.id})" 
+                     class="customer-card bg-slate-800 p-4 rounded-xl border border-slate-700 cursor-pointer hover:border-blue-400 group ${activeId === c.id ? 'border-blue-500 bg-blue-900/40 shadow-lg shadow-blue-500/10' : ''}">
+                    <div class="flex items-center gap-3">
+                        <span class="text-3xl group-hover:scale-110 transition duration-300">${c.avatar}</span>
+                        <div class="flex-1">
+                            <h4 class="font-bold text-sm">${c.name}</h4>
+                            <p class="text-[10px] text-slate-400 uppercase tracking-tight">${c.order}</p>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function selectCustomer(id) {
+            activeId = id;
+            gameState = { method: null, headers: [], body: null };
+            const customer = customers.find(c => c.id === id);
+            
+            document.getElementById('learning-tip').innerText = customer.tip;
+            renderCustomers();
+            renderAPIInterface(customer);
+        }
+
+        function renderAPIInterface(customer) {
+            const container = document.getElementById('active-request-ui');
+            
+            container.innerHTML = `
+                <div class="space-y-6">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-slate-700 pb-4">
+                        <div>
+                            <span class="text-blue-400 text-[10px] font-black uppercase tracking-[0.2em]">Request Builder</span>
+                            <h3 class="text-xl font-extrabold tracking-tight">Constructing API Call</h3>
+                        </div>
+                        <div class="code-font bg-slate-900 px-3 py-1 rounded-md border border-slate-700 text-blue-300 text-sm overflow-hidden text-ellipsis">
+                            GET https://api.diner.io<span class="text-emerald-400">${customer.target}</span>
+                        </div>
+                    </div>
+
+                    <!-- Step 1: Method -->
+                    <div class="space-y-3">
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-widest">1. Select HTTP Verb</label>
+                        <div class="grid grid-cols-4 gap-2">
+                            ${['GET', 'POST', 'PUT', 'DELETE'].map(m => `
+                                <button onclick="setMethod('${m}')" 
+                                    class="py-3 rounded-xl font-bold code-font transition-all border-2 text-sm
+                                    ${gameState.method === m ? 'bg-blue-500 border-blue-400 shadow-lg shadow-blue-500/20' : 'bg-slate-700/50 border-transparent hover:bg-slate-700'}">
+                                    ${m}
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Headers -->
+                    <div class="space-y-3">
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-widest">2. Set Request Headers</label>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="toggleHeader('Authorization')" 
+                                class="flex-1 min-w-[140px] px-4 py-3 rounded-xl text-xs font-bold transition-all border-2 
+                                ${gameState.headers.includes('Authorization') ? 'bg-indigo-600 border-indigo-400' : 'bg-slate-700/50 border-transparent'}">
+                                🔑 Authorization
+                            </button>
+                            <button onclick="toggleHeader('Content-Type')" 
+                                class="flex-1 min-w-[140px] px-4 py-3 rounded-xl text-xs font-bold transition-all border-2 
+                                ${gameState.headers.includes('Content-Type') ? 'bg-amber-600 border-amber-400' : 'bg-slate-700/50 border-transparent'}">
+                                📄 Content-Type: JSON
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Body -->
+                    ${customer.method !== 'GET' ? `
+                    <div class="space-y-3">
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-widest">3. JSON Body (Payload)</label>
+                        <div class="bg-slate-900 p-4 rounded-xl border border-slate-700">
+                            <pre class="code-font text-xs text-blue-300">${JSON.stringify(customer.payload, null, 2)}</pre>
+                        </div>
+                    </div>
+                    ` : ''}
+
+                    <button onclick="sendRequest()" class="w-full mt-4 bg-emerald-500 hover:bg-emerald-400 py-4 rounded-2xl font-black text-lg transition-all active:scale-95 shadow-lg shadow-emerald-500/20">
+                        EXECUTE REQUEST
+                    </button>
+                </div>
+            `;
+        }
+
+        function setMethod(m) {
+            gameState.method = m;
+            renderAPIInterface(customers.find(c => c.id === activeId));
+        }
+
+        function toggleHeader(h) {
+            if (gameState.headers.includes(h)) {
+                gameState.headers = gameState.headers.filter(x => x !== h);
+            } else {
+                gameState.headers.push(h);
+            }
+            renderAPIInterface(customers.find(c => c.id === activeId));
+        }
+
+        function addLog(method, path, status, isSuccess) {
+            const logContainer = document.getElementById('response-log');
+            if (logs.length === 0) logContainer.innerHTML = '';
+            
+            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const colorClass = isSuccess ? 'text-emerald-400' : 'text-red-400';
+            
+            const entry = document.createElement('div');
+            entry.className = 'log-entry border-b border-slate-800 pb-2 mb-2';
+            entry.innerHTML = `
+                <div class="flex justify-between items-start opacity-70">
+                    <span>${time}</span>
+                    <span class="font-bold">${method}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="truncate pr-2">${path}</span>
+                    <span class="${colorClass} font-bold">${status}</span>
+                </div>
+            `;
+            
+            logContainer.prepend(entry);
+            logs.push({ status, isSuccess });
+        }
+
+        function sendRequest() {
+            const customer = customers.find(c => c.id === activeId);
+            let error = null;
+            let statusCode = 200;
+
+            if (gameState.method !== customer.method) {
+                error = `The server received a <strong>${gameState.method}</strong> request, but it was expecting a <strong>${customer.method}</strong> for this endpoint.`;
+                statusCode = 405;
+            } else if (customer.requiresAuth && !gameState.headers.includes('Authorization')) {
+                error = "<strong>401 Unauthorized</strong>: You didn't provide a valid Authorization token in the headers.";
+                statusCode = 401;
+            } else if (customer.method === 'POST' && !gameState.headers.includes('Content-Type')) {
+                error = "<strong>415 Unsupported Media Type</strong>: You sent data in the body, but didn't tell the server it's 'application/json' via headers.";
+                statusCode = 415;
+            }
+
+            if (error) {
+                addLog(gameState.method || '???', customer.target, statusCode, false);
+                showResult(false, statusCode, error);
+            } else {
+                addLog(customer.method, customer.target, customer.expectedResponse, true);
+                showResult(true, customer.expectedResponse, `Excellent! The server accepted your request and returned the requested data.`);
+            }
+        }
+
+        function showResult(success, code, msg) {
+            const modal = document.getElementById('modal-overlay');
+            const title = document.getElementById('modal-title');
+            const icon = document.getElementById('modal-icon');
+            const content = document.getElementById('modal-content');
+
+            title.innerText = `HTTP ${code}`;
+            icon.innerText = success ? "✅" : "❌";
+            modal.querySelector('div').className = `bg-slate-800 border-2 ${success ? 'border-emerald-500' : 'border-red-500'} rounded-3xl p-8 max-w-md w-full text-center`;
+            
+            content.innerHTML = `
+                <p class="mb-4">${msg}</p>
+                ${success ? `
+                <div class="text-left bg-slate-900 p-4 rounded-lg code-font text-[10px] overflow-hidden">
+                    <div class="text-emerald-500 mb-1">// Response JSON</div>
+                    { "status": "success", "data": "Request fulfilled" }
+                </div>` : ''}
+            `;
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('modal-overlay').classList.add('hidden');
+            const currentIdx = customers.findIndex(c => c.id === activeId);
+            if (currentIdx < customers.length - 1) {
+                selectCustomer(customers[currentIdx + 1].id);
+            } else {
+                selectCustomer(customers[0].id);
+            }
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
